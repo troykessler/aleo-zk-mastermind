@@ -42,8 +42,12 @@ program mastermind.aleo {
         code: [u8; 4],
     }
 
-    @noupgrade
-    constructor() {}
+    @custom
+    constructor() {
+        if std::ctx::edition() > 0u16 {
+            assert_eq(std::ctx::program_owner(), aleo1s04xz7v48t8jyf5kyzv5f080ctm3wfcrv0ezk2u0l863q79neuxsv2yg9n);
+        }
+    }
 
     fn codemaker_create_game(public codebreaker: address, unverified_game_id: u64, code: [u8; 4]) -> (Solution, Final) {
         let codemaker: address = std::ctx::caller();
@@ -197,7 +201,7 @@ fn calculate_feedback_pegs(guess: [u8; 4], solution: [u8; 4]) -> [u8; 2] {
 
     let color_matches = 0u8;
 
-    for color in 0u8..8u8 {
+    for color in 0u8..COLORS {
         let in_guess = 0u8;
         let in_solution = 0u8;
 
