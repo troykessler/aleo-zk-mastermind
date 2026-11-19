@@ -1,11 +1,12 @@
 import { Feedback } from '../components/MastermindBoard'
 import { Peg } from '../components/Pegs'
+import PageTitle from '../components/PageTitle'
 import { useTabTitle } from '../useTabTitle'
 
 export default function GameRules() {
   useTabTitle('Rules')
   return <article className="rules-page">
-    <h1>How to play Mastermind</h1>
+    <PageTitle>How to play Mastermind</PageTitle>
     <p>The codemaker hides four colored pegs. The codebreaker has ten guesses to find the colors in the right order.</p>
 
     <div className="rules-layout">

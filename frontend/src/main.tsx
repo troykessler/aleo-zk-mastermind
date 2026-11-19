@@ -4,11 +4,14 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { activeCountQuery, endpoint, gamePollInterval, programId, shortAddress, testnetEndpoint } from './aleo/games'
 import { useShield } from './aleo/useShield'
 import { useGameTransactions } from './aleo/useGameTransactions'
-import ExternalLinkIcon from './components/ExternalLinkIcon'
+import ExplorerLink from './components/ExplorerLink'
 import GameRules from './pages/GameRules'
+import WhyZk from './pages/WhyZk'
 import ActionButton from './components/ActionButton'
+import PageTitle from './components/PageTitle'
 import TransactionLog from './components/TransactionLog'
 import GamePage from './pages/GamePage'
+import GameArchive from './pages/GameArchive'
 import Lobby from './pages/Lobby'
 import CreateGame from './pages/CreateGame'
 import './style.css'
@@ -22,18 +25,20 @@ function GameApp({ wallet }: { wallet: ReturnType<typeof useShield> }) {
     refetchInterval: gamePollInterval,
     refetchIntervalInBackground: true,
   })
-  const activity = <TransactionLog entries={transactions.entries} />
+  const activity = <TransactionLog entries={transactions.entries} stopTracking={transactions.stopTracking} />
   return <div className="shell">
     <header><Link to="/" className="brand"><span className="mark" aria-hidden="true"><i/><i/><i/><i/></span>Aleo Mastermind</Link>
       <nav aria-label="Main navigation">
         <NavLink to="/" end>Play</NavLink>
-        <NavLink to="/games" className="my-games-link">
+        {wallet.address && <NavLink to="/games" className="my-games-link">
           My games
-          {count !== undefined && <span className="active-count" title={count === 1n ? '1 active game' : count + ' active games'}>
+          {count !== undefined && count > 0n && <span className="active-count" title={count === 1n ? '1 active game' : count + ' active games'}>
             {count.toString()}
           </span>}
-        </NavLink>
+        </NavLink>}
+        <NavLink to="/archive">Archive</NavLink>
         <NavLink to="/rules">Rules</NavLink>
+        <NavLink to="/why-zk">Why ZK?</NavLink>
       </nav>
       <ActionButton className="wallet" onClick={wallet.toggle} busy={wallet.busy} title={wallet.address || undefined}>
         {wallet.address ? <>
@@ -50,17 +55,20 @@ function GameApp({ wallet }: { wallet: ReturnType<typeof useShield> }) {
         </CreateGame>
       } />
       <Route path="/new" element={<Navigate to="/" replace />} />
-      <Route path="/games" element={<><h1>My games</h1><Lobby address={wallet.address} connect={wallet.toggle} busy={wallet.busy} /></>} />
+      <Route path="/games" element={wallet.address
+        ? <><PageTitle>My games</PageTitle><Lobby address={wallet.address} /></>
+        : <section><PageTitle>Connect your wallet</PageTitle>
+          <p>Connect Shield to view your games, or browse the <Link to="/archive">public game archive</Link>.</p>
+        </section>} />
+      <Route path="/archive" element={<GameArchive />} />
       <Route path="/rules" element={<GameRules />} />
+      <Route path="/why-zk" element={<WhyZk />} />
       <Route path="/game/:id" element={<GamePage address={wallet.address} transactions={transactions} />} />
-      <Route path="*" element={<section><h1>Page not found</h1><Link to="/">Return to board</Link></section>} />
+      <Route path="*" element={<section><PageTitle>Page not found</PageTitle><Link to="/">Return to board</Link></section>} />
     </Routes></main>
-    <footer><span className="network">{endpoint === testnetEndpoint ? 'Aleo Testnet' : 'Custom Aleo node'}</span>
-      <a className="explorer-link" href={'https://testnet.explorer.provable.com/program/' + encodeURIComponent(programId)}
-        target="_blank" rel="noopener noreferrer" aria-label={programId + ' on the public testnet explorer (opens in a new tab)'}>
-        {programId}
-        <ExternalLinkIcon />
-      </a>
+    <footer>
+      <span className="network">{endpoint === testnetEndpoint ? 'Testnet' : 'Custom Aleo node'}</span>
+      <ExplorerLink type="program" id={programId}>{programId}</ExplorerLink>
       <span className="node-endpoint">{endpoint}</span>
     </footer>
   </div>

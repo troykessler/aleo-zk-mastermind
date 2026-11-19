@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { readPrivateCode } from '../aleo/useShield'
+import { isShieldLocked, readPrivateCode } from '../aleo/useShield'
 import ActionButton from './ActionButton'
 import { PegSlots } from './MastermindBoard'
 
@@ -14,7 +14,7 @@ export default function PrivateCode({ maker, id }: { maker: string; id: string }
     try {
       setCode(await readPrivateCode(maker, id))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Couldn’t read your private code.')
+      if (!isShieldLocked(cause)) setError(cause instanceof Error ? cause.message : 'Couldn’t read your private code.')
     } finally {
       setBusy(false)
     }

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
-import { endpoint, gamePollInterval, getBoard, isGameId, shortAddress, testnetEndpoint, turnLabel } from '../aleo/games'
+import { endpoint, gamePollInterval, getBoard, isGameId, shortAddress, testnetEndpoint, turnLabel, type Board } from '../aleo/games'
 import { useTabTitle } from '../useTabTitle'
 import type { GameTransactions } from '../aleo/useGameTransactions'
 import ActionButton, { RefreshButton } from '../components/ActionButton'
 import GameHistory from '../components/GameHistory'
+import PageTitle from '../components/PageTitle'
 import TransactionLog from '../components/TransactionLog'
-import ExternalLinkIcon from '../components/ExternalLinkIcon'
+import ExplorerLink from '../components/ExplorerLink'
 import PrivateCode from '../components/PrivateCode'
 import MastermindBoard, { ColorPalette, PegSlots, usePegSelection } from '../components/MastermindBoard'
 
@@ -72,6 +73,19 @@ function CopyGameLink() {
   </button>
 }
 
+function gameResult({ game, rows }: Board, address: string) {
+  const score = rows[game.round - 1]?.pegs
+  if (!score) return { title: 'Game complete', detail: 'Waiting for the final score…' }
+
+  const solved = score[1] === 4
+  const winner = solved ? 'codebreaker' : 'codemaker'
+  const title = address === game[winner] ? `You won as the ${winner}!` : solved ? 'Codebreaker won' : 'Codemaker won'
+  const detail = solved
+    ? `All four colors were in the right spots on guess ${game.round}.`
+    : `The secret code stayed unsolved through all ${game.round} guesses.`
+  return { title, detail }
+}
+
 export default function GamePage({ address, transactions }: { address: string; transactions: GameTransactions }) {
   const { id = '' } = useParams()
   const valid = isGameId(id)
@@ -87,24 +101,21 @@ export default function GamePage({ address, transactions }: { address: string; t
   })
   const board = query.data
   const game = board?.game
+  const result = board?.game.completed ? gameResult(board, address) : null
   const role = board?.rows[game?.round ?? 0]?.guess ? 'codemaker' : 'codebreaker'
   let turn = role === 'codemaker' ? 'Codemaker’s turn' : 'Codebreaker’s turn'
-  if (game?.completed) turn = 'Game complete'
+  if (result) turn = result.title
   else if (game && address === game[role]) turn = role === 'codebreaker' ? 'Your turn to guess' : 'Your turn to give feedback'
   const waiting = game && !game.completed && address === (role === 'codemaker' ? game.codebreaker : game.codemaker)
   const tabStatus = waiting ? (role === 'codemaker' ? 'Waiting for feedback' : 'Waiting for a guess') : turn
   useTabTitle(game ? tabStatus + ' · ' + turnLabel(game) + ' · Game #' + id : undefined)
   return <>
     <div className="game-heading">
-      <h1>{valid ? 'Game #' + id : 'Invalid game ID'}</h1>
+      {valid ? <h1>Game <span className="game-number">#{id}</span></h1> : <PageTitle>Invalid game ID</PageTitle>}
       {game && <dl className="game-players" aria-label="Game players">
         {(['codemaker', 'codebreaker'] as const).map(role => <div key={role}>
           <dt>{role}{address === game[role] && ' (you)'}</dt>
-          <dd><a className="explorer-link" href={'https://testnet.explorer.provable.com/address/' + encodeURIComponent(game[role])}
-            target="_blank" rel="noopener noreferrer" title={game[role]}
-            aria-label={`View ${role} account ${game[role]} on the testnet explorer (opens in a new tab)`}>
-            {shortAddress(game[role])}<ExternalLinkIcon />
-          </a></dd>
+          <dd><ExplorerLink type="address" id={game[role]}>{shortAddress(game[role])}</ExplorerLink></dd>
         </div>)}
       </dl>}
       {valid && <div className="game-actions" key={id}>
@@ -121,14 +132,14 @@ export default function GamePage({ address, transactions }: { address: string; t
         privateView={!game.completed && address === game.codemaker && endpoint === testnetEndpoint
           ? <PrivateCode key={address + ':' + id} maker={address} id={id} /> : undefined}
         activeRound={game.completed ? undefined : game.round} transactionLog={
-          <TransactionLog entries={transactions.entries}>
+          <TransactionLog entries={transactions.entries} stopTracking={transactions.stopTracking}>
             <GameHistory key={id} board={board} />
           </TransactionLog>
         }>
         <div className="panel game-info">
           <div className="tray-label game-turn">{turnLabel(game)}</div>
-          <h2>{turn}</h2>
-          {game.completed ? <p>The secret code has been revealed.</p> :
+          <h2 aria-live="polite">{turn}</h2>
+          {result ? <p>{result.detail}</p> :
             address !== game[role] ? <p>{role === 'codebreaker' ? 'Waiting for the codebreaker’s next guess.' : 'Waiting for the codemaker’s feedback.'}</p> :
             endpoint !== testnetEndpoint ? <p>Playing a turn with Shield requires the public testnet.</p> :
             role === 'codemaker' ? <FeedbackAction id={id} round={game.round} transactions={transactions} /> :

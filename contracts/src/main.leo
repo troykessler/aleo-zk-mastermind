@@ -190,7 +190,7 @@ final fn remove_active_game(player: address, game_id: u64) {
     active_count.set(player, last_slot);
 }
 
-fn calculate_feedback_pegs(guess: [u8; 4], solution: [u8; 4]) -> [u8; 2] {
+export fn calculate_feedback_pegs(guess: [u8; 4], solution: [u8; 4]) -> [u8; 2] {
     let red = 0u8;
 
     for i in 0u8..4u8 {

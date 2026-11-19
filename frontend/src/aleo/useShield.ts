@@ -5,6 +5,24 @@ import { ShieldWalletAdapter } from '@provablehq/aleo-wallet-adapter-shield'
 import { byteArray, endpoint, getGame, getGuess, nextGameId, programId, testnetEndpoint } from './games'
 
 const adapter = new ShieldWalletAdapter({ remote: false })
+const sessionEvents = new EventTarget()
+
+export function isShieldLocked(cause: unknown) {
+  const message = cause instanceof Error ? cause.name + ' ' + cause.message : String(cause)
+  return /\bNotUnlocked\b|\bUnlock Shield\b/i.test(message)
+}
+
+async function walletRequest<T>(request: Promise<T>): Promise<T> {
+  const account = adapter.account
+  try {
+    return await request
+  } catch (cause) {
+    if (account && account === adapter.account && isShieldLocked(cause)) {
+      sessionEvents.dispatchEvent(new Event('lock'))
+    }
+    throw cause
+  }
+}
 
 function colorInput(colors: number[]) {
   if (colors.length !== 4 || colors.some(c => !Number.isInteger(c) || c < 0 || c > 5)) {
@@ -23,11 +41,11 @@ export async function submitGame(maker: string, breaker: string, colors: number[
   if (adapter.account?.address !== maker || adapter.network !== Network.TESTNET) {
     throw new Error('Reconnect the codemaker account to Shield on testnet.')
   }
-  const { transactionId } = await adapter.executeTransaction({
+  const { transactionId } = await walletRequest(adapter.executeTransaction({
     program: programId, function: 'codemaker_create_game',
     inputs: [breaker, id + 'u64', code],
     privateFee: false,
-  })
+  }))
   return { id, transactionId, breaker }
 }
 
@@ -42,9 +60,9 @@ export async function submitGuess(breaker: string, id: string, round: number, co
   if (game.codebreaker !== breaker || adapter.account?.address !== breaker || adapter.network !== Network.TESTNET) {
     throw new Error('Connect the codebreaker’s testnet account in Shield.')
   }
-  return adapter.executeTransaction({
+  return walletRequest(adapter.executeTransaction({
     program: programId, function: 'codebreaker_guess', inputs: [id + 'u64', guess], privateFee: false,
-  })
+  }))
 }
 
 export async function submitFeedback(maker: string, id: string, round: number) {
@@ -59,16 +77,16 @@ export async function submitFeedback(maker: string, id: string, round: number) {
   }
   const gameId = id + 'u64'
   const state = `{ codemaker: ${game.codemaker}, codebreaker: ${game.codebreaker}, round: ${round}u8, completed: ${game.completed}, solution: ${colorInput(game.solution)} }`
-  return adapter.executeTransaction({
+  return walletRequest(adapter.executeTransaction({
     program: programId, function: 'codemaker_feedback', privateFee: false,
     inputs: [gameId, state, colorInput(guess), {
       type: 'record', program: programId, recordname: 'Solution', filters: { game_id: { eq: gameId } },
     }],
-  })
+  }))
 }
 
 export function transactionStatus(transactionId: string) {
-  return adapter.transactionStatus(transactionId)
+  return walletRequest(adapter.transactionStatus(transactionId))
 }
 
 export async function readPrivateCode(maker: string, id: string) {
@@ -76,8 +94,9 @@ export async function readPrivateCode(maker: string, id: string) {
   if (!isMaker()) throw new Error('Connect the codemaker account on testnet.')
   let records: unknown[]
   try {
-    records = await adapter.requestRecords(programId, true, 'unspent')
-  } catch {
+    records = await walletRequest(adapter.requestRecords(programId, true, 'unspent'))
+  } catch (cause) {
+    if (isShieldLocked(cause)) throw cause
     throw new Error('Shield couldn’t open the record. Approve the read request or reconnect Shield and try again.')
   }
   if (!isMaker()) throw new Error('The connected account changed.')
@@ -126,6 +145,13 @@ export function useShield() {
     })
   }, [])
 
+  const clearSession = useCallback(() => {
+    revision.current++
+    wantsConnection.current = false
+    selectAddress('')
+    setError('')
+  }, [selectAddress])
+
   const connect = useCallback(async () => {
     if (connecting.current || !wantsConnection.current) return
     connecting.current = true
@@ -146,9 +172,13 @@ export function useShield() {
           rememberWallet(true)
         } catch (cause) {
           if (started !== revision.current) continue
-          wantsConnection.current = false
-          rememberWallet(false)
-          setError(cause instanceof Error ? cause.message : 'Shield connection failed.')
+          if (isShieldLocked(cause)) {
+            clearSession()
+          } else {
+            wantsConnection.current = false
+            rememberWallet(false)
+            setError(cause instanceof Error ? cause.message : 'Shield connection failed.')
+          }
         }
         break
       }
@@ -156,7 +186,7 @@ export function useShield() {
       connecting.current = false
       setBusy(false)
     }
-  }, [selectAddress])
+  }, [clearSession, selectAddress])
 
   useEffect(() => {
     try { wantsConnection.current = localStorage.getItem(reconnectKey) === '1' } catch { /* Storage is optional. */ }
@@ -172,25 +202,31 @@ export function useShield() {
       queueMicrotask(() => void connect())
     }
     const disconnected = () => {
-      revision.current++
-      wantsConnection.current = false
+      clearSession()
       rememberWallet(false)
-      selectAddress('')
-      setError('')
+    }
+    const networkChanged = (network: Network) => {
+      if (network === Network.TESTNET || !wantsConnection.current) return
+      disconnected()
+      setError('Switch Shield to testnet and reconnect to play.')
     }
     adapter.on('readyStateChange', restore)
     adapter.on('accountChange', accountChanged)
+    adapter.on('networkChange', networkChanged)
     adapter.on('disconnect', disconnected)
+    sessionEvents.addEventListener('lock', clearSession)
     if (wantsConnection.current && adapter.account) selectAddress(adapter.account.address)
     else restore(adapter.readyState)
     return () => {
       adapter.off('readyStateChange', restore)
       adapter.off('accountChange', accountChanged)
+      adapter.off('networkChange', networkChanged)
       adapter.off('disconnect', disconnected)
+      sessionEvents.removeEventListener('lock', clearSession)
       wantsConnection.current = false
       revision.current++
     }
-  }, [connect, selectAddress])
+  }, [clearSession, connect, selectAddress])
 
   async function toggle() {
     if (busy) return
@@ -207,7 +243,7 @@ export function useShield() {
     try {
       await adapter.disconnect()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Shield disconnect failed.')
+      if (!isShieldLocked(cause)) setError(cause instanceof Error ? cause.message : 'Shield disconnect failed.')
     } finally {
       selectAddress('')
       setBusy(false)

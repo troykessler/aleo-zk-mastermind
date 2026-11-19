@@ -39,11 +39,13 @@ export async function nextGameId(signal: AbortSignal) {
 
 export function byteArray(value: string, length: number, max: number) {
   const match = /^\[\s*(.*?)\s*\]$/s.exec(value)
-  const items = match?.[1].split(',').map(item => /^(\d+)u8$/.exec(item.trim()))
-  if (!items || items.length !== length || items.some(item => !item || Number(item[1]) > max)) {
-    throw new Error('Unexpected peg data.')
-  }
-  return items.map(item => Number(item![1]))
+  const items = match?.[1].split(',')
+  if (items?.length !== length) throw new Error('Unexpected peg data.')
+  return items.map(item => {
+    const byte = /^(\d+)u8$/.exec(item.trim())
+    if (!byte || Number(byte[1]) > max) throw new Error('Unexpected peg data.')
+    return Number(byte[1])
+  })
 }
 
 export interface Game {
@@ -87,24 +89,30 @@ export async function getGuess(id: string, round: number, signal: AbortSignal) {
 export function activeCountQuery(player: string) {
   return queryOptions({
     queryKey: ['active', player, 'count'],
-    queryFn: ({ signal }) => getActiveCount(player, signal),
+    queryFn: async ({ signal, client }) => {
+      const raw = await mapping('active_count', player, signal)
+      if (raw !== null) return uint64(raw)
+      // Older devnode deployments also return null for a missing mapping.
+      await client.fetchQuery({
+        queryKey: ['active-count-mapping', base],
+        queryFn: ({ signal }) => checkActiveCountMapping(signal),
+        staleTime: 60_000,
+      })
+      return 0n
+    },
     staleTime: gamePollInterval,
     enabled: Boolean(player),
   })
 }
 
-async function getActiveCount(player: string, signal: AbortSignal) {
-  const raw = await mapping('active_count', player, signal)
-  if (raw === null) {
-    // The devnode also returns null for a mapping missing from an older deployment.
-    const response = await fetch(base + '/mappings', { signal })
-    if (!response.ok) throw new Error('Check that the configured program is deployed.')
-    const names: unknown = await response.json()
-    if (!Array.isArray(names) || !names.includes('active_count')) {
-      throw new Error('This deployment needs the updated contract with active-game mappings.')
-    }
+async function checkActiveCountMapping(signal: AbortSignal) {
+  const response = await fetch(base + '/mappings', { signal })
+  if (!response.ok) throw new Error('Check that the configured program is deployed.')
+  const names: unknown = await response.json()
+  if (!Array.isArray(names) || !names.includes('active_count')) {
+    throw new Error('This deployment needs the updated contract with active-game mappings.')
   }
-  return raw === null ? 0n : uint64(raw)
+  return true
 }
 
 export async function getLobby(player: string, offset: bigint, count: bigint, signal: AbortSignal) {
@@ -120,7 +128,7 @@ export async function getLobby(player: string, offset: bigint, count: bigint, si
     const nextPlayer = guess === null ? game.codebreaker : game.codemaker
     return { game, yourTurn: nextPlayer === player }
   }))
-  return { count, entries: entries.filter(entry => entry !== null) }
+  return entries.filter(entry => entry !== null)
 }
 
 export type Board = { game: Game; rows: { guess: number[] | null; pegs: number[] | null }[] }

@@ -54,6 +54,7 @@ export async function getGameHistory(client: QueryClient, board: Board, signal: 
   let cursor: Cursor | undefined
   const limit = 20
   do {
+    signal.throwIfAborted()
     const params = new URLSearchParams({ limit: String(limit), sort: 'desc' })
     if (cursor) {
       params.set('cursor_block_number', String(cursor.block_number))
