@@ -1,4 +1,5 @@
 const TURNS: u8 = 10;
+const COLORS: u8 = 6;
 
 struct Game {
     codemaker: address,
@@ -15,12 +16,25 @@ struct RoundKey {
     round: u8,
 }
 
+export struct PlayerSlot {
+    player: address,
+    slot: u64,
+}
+
+export struct PlayerGame {
+    player: address,
+    game_id: u64,
+}
+
 program mastermind.aleo {
     storage game_counter: u64;
 
     mapping games: u64 => Game;
     mapping guesses: RoundKey => [u8; 4];
     mapping pegs: RoundKey => [u8; 2]; // white/red
+    mapping active_count: address => u64;
+    mapping active_game: PlayerSlot => u64;
+    mapping active_slot: PlayerGame => u64;
 
     record Solution {
         owner: address,
@@ -35,7 +49,7 @@ program mastermind.aleo {
         let codemaker: address = std::ctx::caller();
 
         for i: u8 in 0u8..4u8 {
-            assert(code[i] < 8);
+            assert(code[i] < COLORS);
         }
 
         let solution = Solution {
@@ -60,6 +74,8 @@ program mastermind.aleo {
                     solution: [0u8; 4],
                 });
 
+                add_active_game(codemaker, game_id);
+                add_active_game(codebreaker, game_id);
                 game_counter = game_id + 1;
             }
         );
@@ -69,6 +85,10 @@ program mastermind.aleo {
         let codebreaker: address = std::ctx::caller();
 
         return final {
+            for i: u8 in 0u8..4u8 {
+                assert(guess[i] < COLORS);
+            }
+
             assert(games.contains(game_id));
 
             let game = games.get(game_id);
@@ -131,9 +151,39 @@ program mastermind.aleo {
                 game.solution = game_solution;
 
                 games.set(game_id, game);
+                if game_completed {
+                    remove_active_game(game.codemaker, game_id);
+                    remove_active_game(game.codebreaker, game_id);
+                }
             },
         );
     }
+}
+
+final fn add_active_game(player: address, game_id: u64) {
+    let slot = active_count.get_or_use(player, 0u64);
+
+    active_game.set(PlayerSlot { player, slot }, game_id);
+    active_slot.set(PlayerGame { player, game_id }, slot);
+    active_count.set(player, slot + 1u64);
+}
+
+final fn remove_active_game(player: address, game_id: u64) {
+    let game_key = PlayerGame { player, game_id };
+    let slot = active_slot.get(game_key);
+    let last_slot = active_count.get(player) - 1u64;
+    let last_key = PlayerSlot { player, slot: last_slot };
+
+    if slot != last_slot {
+        let moved_id = active_game.get(last_key);
+        
+        active_game.set(PlayerSlot { player, slot }, moved_id);
+        active_slot.set(PlayerGame { player, game_id: moved_id }, slot);
+    }
+
+    active_game.remove(last_key);
+    active_slot.remove(game_key);
+    active_count.set(player, last_slot);
 }
 
 fn calculate_feedback_pegs(guess: [u8; 4], solution: [u8; 4]) -> [u8; 2] {
