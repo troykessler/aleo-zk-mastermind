@@ -40,12 +40,26 @@ function GameApp({ wallet }: { wallet: ReturnType<typeof useShield> }) {
         <NavLink to="/rules">Rules</NavLink>
         <NavLink to="/why-zk">Why ZK?</NavLink>
       </nav>
-      <ActionButton className="wallet" onClick={wallet.toggle} busy={wallet.busy} title={wallet.address || undefined}>
-        {wallet.address ? <>
-          <span className="wallet-address">{shortAddress(wallet.address)}</span>
-          <span className="wallet-action">{wallet.busy ? 'Disconnecting…' : 'Disconnect Shield'}</span>
-        </> : wallet.busy ? 'Connecting…' : 'Connect Shield'}
-      </ActionButton>
+      <div className="header-actions">
+        <a className="github-link" href="https://github.com/troykessler/aleo-zk-mastermind"
+          target="_blank" rel="noopener noreferrer" title="View source on GitHub"
+          aria-label="View source on GitHub (opens in a new tab)">
+          <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38l-.01-1.49c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+          </svg>
+        </a>
+        <ActionButton className="wallet" onClick={wallet.toggle} busy={wallet.busy}
+          title={wallet.address ? `Disconnect Shield (${wallet.address})` : undefined}
+          aria-label={wallet.address && !wallet.busy ? `Disconnect Shield wallet ${shortAddress(wallet.address)}` : undefined}>
+          {wallet.busy ? (wallet.address ? 'Disconnecting…' : 'Connecting…') : wallet.address ? <>
+            <span className="wallet-address">{shortAddress(wallet.address)}</span>
+            <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 4H4v16h5m5-13 5 5-5 5m-6-5h11" />
+            </svg>
+          </> : 'Connect Shield'}
+        </ActionButton>
+      </div>
     </header>
     {wallet.error && <p className="error wallet-error" role="alert">{wallet.error}</p>}
     <main><Routes>

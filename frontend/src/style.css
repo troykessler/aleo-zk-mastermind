@@ -25,9 +25,11 @@ button:hover:enabled { filter: brightness(1.13); }
 button:disabled { cursor: default; opacity: .5; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .wallet, .secondary { border: 1px solid #52594b; color: var(--ink); background: #20251e; font-size: .9rem; }
-.wallet { margin-left: auto; }
-.wallet-address { display: block; font: 600 .875rem/1.25 var(--mono); }
-.wallet-action { display: block; font-size: .75rem; color: var(--muted); }
+.header-actions { display: flex; flex: none; gap: 8px; margin-left: auto; }
+.github-link { display: grid; place-items: center; width: 44px; min-height: 44px; color: var(--muted); }
+.github-link:hover, .github-link:focus-visible { color: var(--ink); }
+.wallet { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; white-space: nowrap; }
+.wallet-address { font: 600 .875rem/1.25 var(--mono); }
 .explorer-link { display: inline-flex; align-items: center; gap: 5px; }
 main { margin: clamp(20px, 4vw, 44px) 0 32px; }
 h1, h2, p { margin: 0; }
@@ -199,6 +201,11 @@ input::placeholder { color: #949d8e; }
 .error { color: #ffa9a0; margin-top: 10px; }
 footer { flex-wrap: wrap; padding: 16px 0 24px; border-top: 1px solid var(--line); font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
 .network { color: var(--ink); } .node-endpoint { margin-left: auto; }
+@media (max-width: 820px) {
+  header { flex-wrap: wrap; padding-top: 14px; gap: 6px; }
+  nav { order: 3; flex-basis: 100%; min-width: 0; margin: 0; height: 42px; gap: clamp(8px, 3vw, 20px); overflow-x: auto; }
+  nav > a { flex-shrink: 0; }
+}
 @media (max-width: 700px) {
   .play-layout, .columns, .rules-layout { grid-template-columns: minmax(0, 1fr); }
   .archive-table th, .archive-table td { padding: 10px 12px; }
@@ -207,8 +214,5 @@ footer { flex-wrap: wrap; padding: 16px 0 24px; border-top: 1px solid var(--line
   .board-case, .play-controls { display: contents; }
   .secret-tray, .guess-tray { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #1b211a; }
   .secret-tray { order: 1; } .setup-panel, .game-info { order: 2; } .guess-tray { order: 3; } .console { order: 4; }
-  header { flex-wrap: wrap; padding-top: 14px; gap: 6px; }
-  nav { order: 3; flex-basis: 100%; min-width: 0; margin: 0; height: 42px; gap: clamp(8px, 3vw, 20px); overflow-x: auto; }
-  nav > a { flex-shrink: 0; }
   .node-endpoint { margin-left: 0; }
 }
