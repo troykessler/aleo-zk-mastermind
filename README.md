@@ -13,8 +13,6 @@ This game is intended for two players, so you can play against a friend or a ran
 3. Open the [Aleo testnet faucet](https://faucet.aleo.org/), connect Shield, and request credits. Both players use credits to submit moves.
 4. Visit https://zkmastermind.troykessler.xyz/ and start playing!
 
-![A staged game on turn five. Four guesses have been scored and the codebreaker is choosing the next four pegs.](docs/images/mastermind-game.png)
-
 ## Why zero knowledge?
 
 Programmable blockchains establish trust between two parties without needing a central authority, but this game requires keeping information (the secret code which needs to be guessed) hidden from the other player. Standard public blockchains establish trust but fail to keep anything private because they rely on having _everything_ public so validators can verify all state changes.
@@ -24,14 +22,6 @@ This is where Aleo and its zero knowledge features come in very handy since it a
 So this game is a good example of how to leverage Aleo's zero knowledge features since the codebreaker doesn't need to worry about a lying codemaker. The codemaker can derive the exact and partial match feedback from his secret code and submit it on-chain along with a zkSnark proof. Aleo validators can then verify that the codemaker indeed derived the feedback correctly without needing to know the full private information. This solves the trust and private information problem allowing for a fully decentralized version of this game.
 
 Another good example would be Battleship, where you have to tell the other player if they hit one of your ships without giving away where all your ships are.
-
-## Game rules
-
-The codemaker picks four pegs from six colors and hides them in a particular order. Colors can repeat. The codebreaker gets ten guesses to find the code.
-
-After each guess, the codemaker gives feedback. A coral clue means one peg has the right color in the right spot. An ivory clue means one peg has the right color in a different spot. The clues can come from anywhere in the row, so you still have to figure out which pegs earned them. Each peg counts once, with exact matches counted first.
-
-Four exact matches win the game for the codebreaker, even on the last guess. If the code is still a mystery after ten guesses, the codemaker wins. Either way, the board reveals the code at the end.
 
 ## Build and test the contract
 
